@@ -13,4 +13,7 @@ public class PickPoint {
 
     @TableField("name")
     private String name;
+
+    @TableField("address")
+    private String address;
 }

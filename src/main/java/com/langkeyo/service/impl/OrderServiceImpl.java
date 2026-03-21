@@ -112,13 +112,16 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         dto.setPrice(order.getTotalPrice() == null ? "0.00" : order.getTotalPrice().toPlainString());
         dto.setStatus(order.getStatus());
         String pickPointName = "";
+        String pickPointAddress = "";
         if (order.getPickPointId() != null) {
             PickPoint pickPoint = pickPointMapper.selectById(order.getPickPointId());
             if (pickPoint != null) {
                 pickPointName = pickPoint.getName();
+                pickPointAddress = pickPoint.getAddress();
             }
         }
         dto.setPickPointName(pickPointName);
+        dto.setPickPointAddress(pickPointAddress);
         dto.setCreateTime(order.getCreateTime() == null ? "" : order.getCreateTime().format(DATE_TIME_FORMATTER));
         return dto;
     }
