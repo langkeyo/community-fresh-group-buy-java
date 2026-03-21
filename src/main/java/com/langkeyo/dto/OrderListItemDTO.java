@@ -11,4 +11,5 @@ public class OrderListItemDTO {
     private String price;
     private Integer status;
     private String createTime;
+    private String pickPointName;
 }

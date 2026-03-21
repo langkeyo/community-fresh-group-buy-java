@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.langkeyo.dto.OrderListItemDTO;
 import com.langkeyo.entity.Order;
+import com.langkeyo.entity.PickPoint;
 import com.langkeyo.entity.Product;
 import com.langkeyo.mapper.OrderMapper;
+import com.langkeyo.mapper.PickPointMapper;
 import com.langkeyo.mapper.ProductMapper;
 import com.langkeyo.service.IOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     @Autowired
     private ProductMapper productMapper;
+
+    @Autowired
+    private PickPointMapper pickPointMapper;
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -106,6 +111,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         dto.setQty(1);
         dto.setPrice(order.getTotalPrice() == null ? "0.00" : order.getTotalPrice().toPlainString());
         dto.setStatus(order.getStatus());
+        String pickPointName = "";
+        if (order.getPickPointId() != null) {
+            PickPoint pickPoint = pickPointMapper.selectById(order.getPickPointId());
+            if (pickPoint != null) {
+                pickPointName = pickPoint.getName();
+            }
+        }
+        dto.setPickPointName(pickPointName);
         dto.setCreateTime(order.getCreateTime() == null ? "" : order.getCreateTime().format(DATE_TIME_FORMATTER));
         return dto;
     }
