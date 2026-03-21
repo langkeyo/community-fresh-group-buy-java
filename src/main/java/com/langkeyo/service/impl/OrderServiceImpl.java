@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -21,6 +22,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     @Autowired
     private ProductMapper productMapper;
+
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
     public boolean createOrder(Order order) {
@@ -83,8 +86,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         Map<Long, String> productNameMap = new HashMap<>();
         if (order.getProductId() != null) {
-            List<Product> products = productMapper.selectNameListByIds(List.of(order.getProductId()));
-            for (Product product : products) {
+            Product product = productMapper.selectNameById(order.getProductId());
+            if (product != null) {
                 productNameMap.put(product.getId(), product.getName());
             }
         }
@@ -103,6 +106,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         dto.setQty(1);
         dto.setPrice(order.getTotalPrice() == null ? "0.00" : order.getTotalPrice().toPlainString());
         dto.setStatus(order.getStatus());
+        dto.setCreateTime(order.getCreateTime() == null ? "" : order.getCreateTime().format(DATE_TIME_FORMATTER));
         return dto;
     }
 }

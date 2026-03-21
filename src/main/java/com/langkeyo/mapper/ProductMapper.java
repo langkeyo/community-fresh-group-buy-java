@@ -19,4 +19,7 @@ public interface ProductMapper extends BaseMapper<Product> {
             "</script>"
     })
     List<Product> selectNameListByIds(@Param("ids") List<Long> ids);
+
+    @Select("SELECT id, name FROM products WHERE id = #{id}")
+    Product selectNameById(@Param("id") Long id);
 }
