@@ -39,4 +39,26 @@ public class OrderController {
         }
         return Result.success(order);
     }
+
+    @PutMapping("/updateStatus/{orderId}")
+    public Result<String> updateOrderStatus(@PathVariable String orderId, @RequestParam Integer status) {
+        // 先判断订单是否存在
+        OrderListItemDTO order = orderService.getOrderDetailById(orderId);
+        if (order == null) {
+            return Result.error(ResultCode.ORDER_NOT_FOUND);
+        }
+
+        // 用当前状态 + 目标状态判断是否合法
+        Integer current = order.getStatus();
+        boolean legal = (current == 1 && status == 2) || (current == 2 && status == 3);
+        if (!legal) {
+            return Result.error(ResultCode.ORDER_STATUS_ERROR);
+        }
+
+        boolean flag =  orderService.updateOrderStatus(orderId, status);
+        if (!flag) {
+            return Result.error(ResultCode.ORDER_UPDATE_FAIL);
+        }
+        return Result.success("订单状态更新成功");
+    }
 }

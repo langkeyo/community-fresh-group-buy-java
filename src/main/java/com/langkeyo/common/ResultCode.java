@@ -27,6 +27,7 @@ public enum ResultCode {
     ORDER_NOT_FOUND(3001, "订单不存在"),
     ORDER_STATUS_ERROR(3002, "订单状态错误"),
     ORDER_CREATE_FAIL(3003, "订单创建失败"),
+    ORDER_UPDATE_FAIL(3004, "订单更新失败"),
 
     // 参数校验 4xxx
     PARAM_ERROR(4001, "参数错误"),

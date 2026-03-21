@@ -100,6 +100,23 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return toOrderListItemDTO(order, productNameMap);
     }
 
+    @Override
+    public boolean updateOrderStatus(String orderId, Integer status) {
+        Order order = this.getById(orderId);
+        if (order == null || status == null) {
+            return false;
+        }
+
+        Integer current = order.getStatus();
+        boolean valid = (current == 1 && status == 2) || (current == 2 && status == 3);
+
+        if (!valid) {
+            return false;
+        }
+
+        return baseMapper.updateOrderStatus(orderId, status) > 0;
+    }
+
     private OrderListItemDTO toOrderListItemDTO(Order order, Map<Long, String> productNameMap) {
         OrderListItemDTO dto = new OrderListItemDTO();
         dto.setId(order.getId());

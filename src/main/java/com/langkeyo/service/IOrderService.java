@@ -21,4 +21,9 @@ public interface IOrderService extends IService<Order> {
      * 根据订单ID查询订单详情
      */
     OrderListItemDTO getOrderDetailById(String orderId);
+
+    /**
+     * 更新订单状态
+     */
+    boolean updateOrderStatus(String orderId, Integer status);
 }
