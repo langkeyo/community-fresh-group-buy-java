@@ -80,17 +80,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (order == null) {
             return null;
         }
-        return toOrderListItemDTO(order);
-    }
 
-    private OrderListItemDTO toOrderListItemDTO(Order order) {
         Map<Long, String> productNameMap = new HashMap<>();
         if (order.getProductId() != null) {
-            Product product = productMapper.selectById(order.getProductId());
-            if (product != null) {
+            List<Product> products = productMapper.selectNameListByIds(List.of(order.getProductId()));
+            for (Product product : products) {
                 productNameMap.put(product.getId(), product.getName());
             }
         }
+
         return toOrderListItemDTO(order, productNameMap);
     }
 
