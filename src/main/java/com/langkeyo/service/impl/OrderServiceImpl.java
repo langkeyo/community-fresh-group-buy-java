@@ -1,7 +1,9 @@
 package com.langkeyo.service.impl;
 
+import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.langkeyo.dto.OrderListItemDTO;
 import com.langkeyo.entity.Order;
 import com.langkeyo.entity.Product;
 import com.langkeyo.mapper.OrderMapper;
@@ -9,11 +11,9 @@ import com.langkeyo.mapper.ProductMapper;
 import com.langkeyo.service.IOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import cn.hutool.core.util.IdUtil;
 
 import java.math.BigDecimal;
-import java.util.List;
-import com.langkeyo.dto.OrderListItemDTO;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,9 +52,25 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         queryWrapper.eq(Order::getUserId, userId);
         queryWrapper.orderByDesc(Order::getCreateTime);
 
-        return this.list(queryWrapper)
-                .stream()
-                .map(this::toOrderListItemDTO)
+        List<Order> orders = this.list(queryWrapper);
+
+        Set<Long> productIds = new HashSet<>();
+        for (Order order : orders) {
+            if (order.getProductId() != null) {
+                productIds.add(order.getProductId());
+            }
+        }
+
+        Map<Long, String> productNameMap = new HashMap<>();
+        if (!productIds.isEmpty()) {
+            List<Product> products = productMapper.selectNameListByIds(List.copyOf(productIds));
+            for (Product product : products) {
+                productNameMap.put(product.getId(), product.getName());
+            }
+        }
+
+        return orders.stream()
+                .map(order -> toOrderListItemDTO(order, productNameMap))
                 .collect(Collectors.toList());
     }
 
@@ -68,14 +84,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
 
     private OrderListItemDTO toOrderListItemDTO(Order order) {
+        Map<Long, String> productNameMap = new HashMap<>();
+        if (order.getProductId() != null) {
+            Product product = productMapper.selectById(order.getProductId());
+            if (product != null) {
+                productNameMap.put(product.getId(), product.getName());
+            }
+        }
+        return toOrderListItemDTO(order, productNameMap);
+    }
+
+    private OrderListItemDTO toOrderListItemDTO(Order order, Map<Long, String> productNameMap) {
         OrderListItemDTO dto = new OrderListItemDTO();
         dto.setId(order.getId());
         dto.setNo(order.getId());
-        Product product = null;
-        if (order.getProductId() != null) {
-            product = productMapper.selectById(order.getProductId());
-        }
-        dto.setName(product != null ? product.getName() : "商品#" + order.getProductId());
+
+        String productName = productNameMap.get(order.getProductId());
+        dto.setName(productName != null ? productName : "商品#" + order.getProductId());
+
         dto.setQty(1);
         dto.setPrice(order.getTotalPrice() == null ? "0.00" : order.getTotalPrice().toPlainString());
         dto.setStatus(order.getStatus());
