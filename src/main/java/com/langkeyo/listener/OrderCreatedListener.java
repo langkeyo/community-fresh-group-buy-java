@@ -12,7 +12,7 @@ import java.util.Map;
 public class OrderCreatedListener {
     @RabbitListener(queues = RabbitConfig.ORDER_CREATED_QUEUE)
     public void onOrderCreated(Map<String, Object> msg) {
-        log.info("收到订单创建消息：{}", msg);
-        log.info("模拟异步通知: 订单{}已创建，后续可发送短信/站内信", msg.get("orderId"));
+        log.info("[ORDER_CREATED] 收到订单创建消息：{}", msg);
+        log.info("[ORDER_CREATED] 模拟异步通知: 订单{}已创建，后续可发送短信/站内信", msg.get("orderId"));
     }
 }

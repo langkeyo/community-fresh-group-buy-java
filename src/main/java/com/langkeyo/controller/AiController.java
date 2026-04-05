@@ -4,6 +4,7 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.langkeyo.common.Result;
 import com.langkeyo.dto.AiRecipeDTO;
 import com.langkeyo.dto.AiRecipeStepDTO;
@@ -16,6 +17,7 @@ import com.langkeyo.service.AiLlmService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -29,6 +31,7 @@ public class AiController {
     private final AiLlmService aiLlmService;
     private final AiRecommendReviewMapper aiRecommendReviewMapper;
     private final AiRecipeLibraryMapper aiRecipeLibraryMapper;
+    private final Environment environment;
 
     @PostMapping("/recommend")
     public Result<AiRecommendRespDTO> recommend(@RequestParam String query) {
@@ -122,26 +125,32 @@ public class AiController {
         return Result.success(aiRecommendReviewMapper.selectList(qw));
     }
 
+    @GetMapping("/review/list/page")
+    public Result<Page<AiRecommendReview>> reviewListPage(@RequestParam(defaultValue = "PENDING") String status,
+                                                          @RequestParam(defaultValue = "1") long page,
+                                                          @RequestParam(defaultValue = "10") long size) {
+        long safePage = page < 1 ? 1 : page;
+        long safeSize = size < 1 ? 10 : Math.min(size, 100);
+        LambdaQueryWrapper<AiRecommendReview> qw = new LambdaQueryWrapper<>();
+        qw.eq(AiRecommendReview::getStatus, status).orderByDesc(AiRecommendReview::getId);
+        Page<AiRecommendReview> p = new Page<>(safePage, safeSize);
+        aiRecommendReviewMapper.selectPage(p, qw);
+        return Result.success(p);
+    }
+
     @PutMapping("/review/approve/{id}")
     public Result<String> approve(@PathVariable Long id, @RequestParam(required = false) String reviewer) {
         AiRecommendReview row = aiRecommendReviewMapper.selectById(id);
         if (row == null) return Result.error("记录不存在");
-        row.setStatus("APPROVED");
-        row.setReviewer(reviewer);
-        row.setReviewedAt(LocalDateTime.now());
-        aiRecommendReviewMapper.updateById(row);
+        String reviewerName = reviewer == null || reviewer.trim().isEmpty() ? "admin" : reviewer.trim();
+        if (!"APPROVED".equals(row.getStatus())) {
+            row.setStatus("APPROVED");
+            row.setReviewer(reviewerName);
+            row.setReviewedAt(LocalDateTime.now());
+            aiRecommendReviewMapper.updateById(row);
+        }
 
-        JSONObject recipeObj = JSONUtil.parseObj(row.getRecipeJson());
-
-        AiRecipeLibrary lib = new AiRecipeLibrary();
-        lib.setQueryText(row.getQueryText());
-        lib.setTitle(recipeObj.getStr("title", "未命名菜谱"));
-        lib.setTagsJson(JSONUtil.toJsonStr(recipeObj.get("tags")));
-        lib.setRecipeJson(row.getRecipeJson());
-        lib.setSource(row.getSource());
-        lib.setCreatedAt(LocalDateTime.now());
-        aiRecipeLibraryMapper.insert(lib);
-
+        ensureLibraryRow(row);
         return Result.success("审核通过");
     }
 
@@ -149,9 +158,13 @@ public class AiController {
     public Result<String> reject(@PathVariable Long id, @RequestParam(required = false) String reviewer, @RequestParam(required = false) String remark) {
         AiRecommendReview row = aiRecommendReviewMapper.selectById(id);
         if (row == null) return Result.error("记录不存在");
+        String safeRemark = remark == null ? "" : remark.trim();
+        if (safeRemark.length() < 2) {
+            return Result.error("驳回原因至少2个字");
+        }
         row.setStatus("REJECTED");
-        row.setReviewer(reviewer == null ? "admin" : reviewer);
-        row.setReviewRemark(remark == null ? "" : remark);
+        row.setReviewer(reviewer == null || reviewer.trim().isEmpty() ? "admin" : reviewer.trim());
+        row.setReviewRemark(safeRemark);
         row.setReviewedAt(LocalDateTime.now());
         aiRecommendReviewMapper.updateById(row);
         return Result.success("已驳回");
@@ -159,6 +172,9 @@ public class AiController {
 
     @PostMapping("/test-llm")
     public Result<String> testLlm(@RequestParam String query) {
+        if (!isDevProfile()) {
+            return Result.error("该接口仅开发环境可用");
+        }
         String content = aiLlmService.ask(query);
         return Result.success(content);
     }
@@ -167,6 +183,49 @@ public class AiController {
         if (q == null) return false;
         for (String w : words) {
             if (q.contains(w)) return true;
+        }
+        return false;
+    }
+
+    private void ensureLibraryRow(AiRecommendReview row) {
+        JSONObject recipeObj = JSONUtil.parseObj(row.getRecipeJson());
+        String title = recipeObj.getStr("title", "未命名菜谱");
+        String normalizedQuery = normalizeQuery(row.getQueryText());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime windowStart = now.minusMinutes(10);
+
+        LambdaQueryWrapper<AiRecipeLibrary> qw = new LambdaQueryWrapper<>();
+        qw.eq(AiRecipeLibrary::getQueryText, normalizedQuery)
+                .eq(AiRecipeLibrary::getTitle, title)
+                .ge(AiRecipeLibrary::getCreatedAt, windowStart)
+                .last("limit 1");
+        AiRecipeLibrary existing = aiRecipeLibraryMapper.selectOne(qw);
+        if (existing != null) {
+            return;
+        }
+
+        AiRecipeLibrary lib = new AiRecipeLibrary();
+        lib.setQueryText(normalizedQuery);
+        lib.setTitle(title);
+        lib.setTagsJson(JSONUtil.toJsonStr(recipeObj.get("tags")));
+        lib.setRecipeJson(row.getRecipeJson());
+        lib.setSource(row.getSource());
+        lib.setCreatedAt(now);
+        aiRecipeLibraryMapper.insert(lib);
+    }
+
+    private String normalizeQuery(String text) {
+        if (text == null) return "";
+        String trimmed = text.trim().toLowerCase(Locale.ROOT);
+        return trimmed.replaceAll("\\s+", " ");
+    }
+
+    private boolean isDevProfile() {
+        String[] profiles = environment.getActiveProfiles();
+        for (String p : profiles) {
+            if ("dev".equalsIgnoreCase(p) || "local".equalsIgnoreCase(p)) {
+                return true;
+            }
         }
         return false;
     }

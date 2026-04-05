@@ -16,7 +16,7 @@ public class AiLlmService {
 
     public String ask(String userPrompt) {
         if (deepSeekProperties.getApiKey() == null || deepSeekProperties.getApiKey().isEmpty()) {
-            throw new RuntimeException("DEEPSEEK_API_KEY 未配置");
+            throw new RuntimeException("AI服务未配置，请联系管理员");
         }
 
         JSONObject body = new JSONObject();
@@ -42,22 +42,33 @@ public class AiLlmService {
         String url = deepSeekProperties.getBaseUrl() + "/chat/completions";
         String apiKey = deepSeekProperties.getApiKey() == null ? "" : deepSeekProperties.getApiKey().trim();
 
-        HttpResponse response = HttpRequest.post(url)
-                .header("Authorization", "Bearer " + apiKey)
-                .header("Content-Type", "application/json")
-                .timeout(deepSeekProperties.getTimeoutMs())
-                .body(body.toString())
-                .execute();
+        try {
+            HttpResponse response = HttpRequest.post(url)
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .timeout(deepSeekProperties.getTimeoutMs())
+                    .body(body.toString())
+                    .execute();
 
-        if (response.getStatus() != 200) {
-            throw new RuntimeException("DeepSeek 调用失败: HTTP " + response.getStatus());
+            int status = response.getStatus();
+            if (status != 200) {
+                throw new RuntimeException(mapHttpStatusMessage(status));
+            }
+
+            JSONObject json = JSONUtil.parseObj(response.body());
+            return json.getJSONArray("choices")
+                    .getJSONObject(0)
+                    .getJSONObject("message")
+                    .getStr("content");
+        } catch (RuntimeException e) {
+            String msg = e.getMessage() == null ? "" : e.getMessage();
+            if (msg.contains("AI服务")) {
+                throw e;
+            }
+            throw new RuntimeException(mapExceptionMessage(e));
+        } catch (Exception e) {
+            throw new RuntimeException(mapExceptionMessage(e));
         }
-
-        JSONObject json = JSONUtil.parseObj(response.body());
-        return json.getJSONArray("choices")
-                .getJSONObject(0)
-                .getJSONObject("message")
-                .getStr("content");
     }
 
     private String extractJson(String content) {
@@ -81,5 +92,23 @@ public class AiLlmService {
         } catch (Exception e) {
             throw new RuntimeException("AI返回不是合法JSON: " + jsonText);
         }
+    }
+
+    private String mapHttpStatusMessage(int status) {
+        if (status == 401 || status == 403) {
+            return "AI服务鉴权失败，请联系管理员";
+        }
+        if (status >= 500) {
+            return "AI服务暂时不可用，请稍后重试";
+        }
+        return "AI服务请求失败，请稍后重试";
+    }
+
+    private String mapExceptionMessage(Exception e) {
+        String text = e == null || e.getMessage() == null ? "" : e.getMessage().toLowerCase();
+        if (text.contains("timeout") || text.contains("timed out") || text.contains("read timed out")) {
+            return "AI服务响应超时，请稍后重试";
+        }
+        return "AI服务请求失败，请稍后重试";
     }
 }
