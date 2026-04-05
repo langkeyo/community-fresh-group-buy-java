@@ -26,12 +26,14 @@ public class ProductController {
     @GetMapping("/list")
     public Result<List<ProductItemDTO>> list(@RequestParam(required = false) String keyword) {
         QueryWrapper<Product> wrapper = new QueryWrapper<>();
+        wrapper.eq("status", 1);
+        wrapper.eq("deleted", 0);
         if (StringUtils.hasText(keyword)) {
             wrapper.like("name", keyword.trim());
         }
         List<Product> products = productMapper.selectList(wrapper);
         List<ProductItemDTO> data = products.stream()
-                .map(item -> new ProductItemDTO(item.getId(), item.getName()))
+                .map(this::toItemDTO)
                 .collect(Collectors.toList());
         return Result.success(data);
     }
@@ -42,6 +44,20 @@ public class ProductController {
         if (product == null) {
             return Result.error(ResultCode.PRODUCT_NOT_FOUND);
         }
-        return Result.success(new ProductItemDTO(product.getId(), product.getName()));
+        return Result.success(toItemDTO(product));
+    }
+
+    private ProductItemDTO toItemDTO(Product product) {
+        ProductItemDTO dto = new ProductItemDTO();
+        dto.setId(product.getId());
+        dto.setName(product.getName());
+        dto.setCategory(product.getCategory());
+        dto.setPrice(product.getPrice());
+        dto.setGroupPrice2(product.getGroupPrice2());
+        dto.setGroupPrice3(product.getGroupPrice3());
+        dto.setStock(product.getStock());
+        dto.setImages(product.getImages());
+        dto.setStatus(product.getStatus());
+        return dto;
     }
 }
