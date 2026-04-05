@@ -16,6 +16,7 @@ public class AiRecipeLibrary {
     private String title;
     private String tagsJson;
     private String recipeJson;
+    private Integer hitCount;
     private String source;
     private LocalDateTime createdAt;
 }

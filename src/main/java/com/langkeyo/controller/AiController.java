@@ -170,6 +170,34 @@ public class AiController {
         return Result.success("已驳回");
     }
 
+    @PostMapping("/review/regenerate/{id}")
+    public Result<String> regenerate(@PathVariable Long id, @RequestParam(required = false) String reviewer) {
+        AiRecommendReview row = aiRecommendReviewMapper.selectById(id);
+        if (row == null) return Result.error("记录不存在");
+        if (!"REJECTED".equals(row.getStatus())) {
+            return Result.error("仅支持驳回记录重新生成");
+        }
+
+        JSONObject aiJson = aiLlmService.askRecipeJson(row.getQueryText());
+        JSONObject recipeObj = aiJson.getJSONObject("recipe");
+        if (recipeObj == null || recipeObj.isEmpty()) {
+            recipeObj = new JSONObject();
+            recipeObj.set("title", aiJson.getStr("title", ""));
+            recipeObj.set("desc", aiJson.getStr("desc", ""));
+            recipeObj.set("tags", aiJson.getJSONArray("tags"));
+            recipeObj.set("image", aiJson.getStr("image", ""));
+            recipeObj.set("steps", aiJson.getJSONArray("steps"));
+        }
+
+        row.setRecipeJson(recipeObj.toString());
+        row.setStatus("PENDING");
+        row.setReviewer(reviewer == null || reviewer.trim().isEmpty() ? "admin" : reviewer.trim());
+        row.setReviewRemark(null);
+        row.setReviewedAt(null);
+        aiRecommendReviewMapper.updateById(row);
+        return Result.success("已重新生成");
+    }
+
     @PostMapping("/test-llm")
     public Result<String> testLlm(@RequestParam String query) {
         if (!isDevProfile()) {
@@ -209,6 +237,7 @@ public class AiController {
         lib.setTitle(title);
         lib.setTagsJson(JSONUtil.toJsonStr(recipeObj.get("tags")));
         lib.setRecipeJson(row.getRecipeJson());
+        lib.setHitCount(0);
         lib.setSource(row.getSource());
         lib.setCreatedAt(now);
         aiRecipeLibraryMapper.insert(lib);
