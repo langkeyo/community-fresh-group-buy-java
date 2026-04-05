@@ -5,7 +5,9 @@ import com.langkeyo.common.ResultCode;
 import com.langkeyo.config.RabbitConfig;
 import com.langkeyo.dto.OrderListItemDTO;
 import com.langkeyo.entity.Order;
+import com.langkeyo.entity.User;
 import com.langkeyo.service.IOrderService;
+import com.langkeyo.service.IUserService;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -22,6 +24,9 @@ import java.util.concurrent.TimeUnit;
 public class OrderController {
     @Autowired
     private IOrderService orderService;
+
+    @Autowired
+    private IUserService userService;
 
     @Autowired
     private RedissonClient redissonClient;
@@ -71,6 +76,18 @@ public class OrderController {
         return Result.success(orders);
     }
 
+    @GetMapping("/leader/list")
+    public Result<List<OrderListItemDTO>> getLeaderOrders(@RequestParam Long leaderId,
+                                                          @RequestParam Long pickPointId,
+                                                          @RequestParam(required = false) Integer status) {
+        User leader = userService.getById(leaderId);
+        if (leader == null || leader.getIsLeader() == null || !leader.getIsLeader()) {
+            return Result.error("非团长无权限");
+        }
+        List<OrderListItemDTO> orders = orderService.getOrdersByPickPointAndStatus(pickPointId, status);
+        return Result.success(orders);
+    }
+
     @GetMapping("/{orderId}")
     public Result<OrderListItemDTO> getOrderDetailById(@PathVariable String orderId) {
         OrderListItemDTO order = orderService.getOrderDetailById(orderId);
@@ -100,5 +117,30 @@ public class OrderController {
             return Result.error(ResultCode.ORDER_UPDATE_FAIL);
         }
         return Result.success("订单状态更新成功");
+    }
+
+    @PutMapping("/leader/confirm/{orderId}")
+    public Result<String> leaderConfirmPick(@PathVariable String orderId,
+                                            @RequestParam Long leaderId,
+                                            @RequestParam Long pickPointId) {
+        User leader = userService.getById(leaderId);
+        if (leader == null || leader.getIsLeader() == null || !leader.getIsLeader()) {
+            return Result.error("非团长无权限");
+        }
+
+        Order order = orderService.getById(orderId);
+        if (order == null) {
+            return Result.error(ResultCode.ORDER_NOT_FOUND);
+        }
+
+        if (order.getPickPointId() == null || !order.getPickPointId().equals(pickPointId)) {
+            return Result.error("订单不属于该自提点");
+        }
+
+        if (!orderService.updateOrderStatus(orderId, 3)) {
+            return Result.error(ResultCode.ORDER_UPDATE_FAIL);
+        }
+
+        return Result.success("核销成功");
     }
 }

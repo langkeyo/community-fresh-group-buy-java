@@ -48,7 +48,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
 
         if (order.getTotalPrice() == null) {
-            order.setTotalPrice(new BigDecimal("9.90"));
+            order.setTotalPrice(BigDecimal.ZERO);
         }
 
         return this.save(order);
@@ -98,6 +98,37 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
 
         return toOrderListItemDTO(order, productNameMap);
+    }
+
+    @Override
+    public List<OrderListItemDTO> getOrdersByPickPointAndStatus(Long pickPointId, Integer status) {
+        LambdaQueryWrapper<Order> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Order::getPickPointId, pickPointId);
+        if (status != null) {
+            queryWrapper.eq(Order::getStatus, status);
+        }
+        queryWrapper.orderByDesc(Order::getCreateTime);
+
+        List<Order> orders = this.list(queryWrapper);
+
+        Set<Long> productIds = new HashSet<>();
+        for (Order order : orders) {
+            if (order.getProductId() != null) {
+                productIds.add(order.getProductId());
+            }
+        }
+
+        Map<Long, String> productNameMap = new HashMap<>();
+        if (!productIds.isEmpty()) {
+            List<Product> products = productMapper.selectNameListByIds(List.copyOf(productIds));
+            for (Product product : products) {
+                productNameMap.put(product.getId(), product.getName());
+            }
+        }
+
+        return orders.stream()
+                .map(order -> toOrderListItemDTO(order, productNameMap))
+                .collect(Collectors.toList());
     }
 
     @Override

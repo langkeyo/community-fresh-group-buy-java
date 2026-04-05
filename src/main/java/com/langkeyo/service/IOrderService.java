@@ -23,6 +23,11 @@ public interface IOrderService extends IService<Order> {
     OrderListItemDTO getOrderDetailById(String orderId);
 
     /**
+     * 团长侧：按自提点与状态筛选订单
+     */
+    List<OrderListItemDTO> getOrdersByPickPointAndStatus(Long pickPointId, Integer status);
+
+    /**
      * 更新订单状态
      */
     boolean updateOrderStatus(String orderId, Integer status);
