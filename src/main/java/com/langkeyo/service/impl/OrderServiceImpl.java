@@ -191,6 +191,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         OrderListItemDTO dto = new OrderListItemDTO();
         dto.setId(order.getId());
         dto.setNo(order.getId());
+        dto.setProductId(order.getProductId());
 
         String productName = productNameMap.get(order.getProductId());
         dto.setName(productName != null ? productName : "商品#" + order.getProductId());
