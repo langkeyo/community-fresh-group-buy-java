@@ -76,6 +76,12 @@ public class OrderController {
         return Result.success(orders);
     }
 
+    @GetMapping("/list/all")
+    public Result<List<OrderListItemDTO>> getAllOrders(@RequestParam(required = false) Integer status) {
+        List<OrderListItemDTO> orders = orderService.getAllOrders(status);
+        return Result.success(orders);
+    }
+
     @GetMapping("/leader/list")
     public Result<List<OrderListItemDTO>> getLeaderOrders(@RequestParam Long leaderId,
                                                           @RequestParam Long pickPointId,
