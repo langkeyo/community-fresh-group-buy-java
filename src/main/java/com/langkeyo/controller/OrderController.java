@@ -5,7 +5,9 @@ import com.langkeyo.common.ResultCode;
 import com.langkeyo.config.RabbitConfig;
 import com.langkeyo.dto.OrderListItemDTO;
 import com.langkeyo.entity.Order;
+import com.langkeyo.entity.Product;
 import com.langkeyo.entity.User;
+import com.langkeyo.mapper.ProductMapper;
 import com.langkeyo.service.IOrderService;
 import com.langkeyo.service.IUserService;
 import org.redisson.api.RLock;
@@ -26,6 +28,9 @@ public class OrderController {
     private IOrderService orderService;
 
     @Autowired
+    private ProductMapper productMapper;
+
+    @Autowired
     private IUserService userService;
 
     @Autowired
@@ -44,6 +49,21 @@ public class OrderController {
             locked = lock.tryLock(0, 5, TimeUnit.SECONDS);
             if (!locked) {
                 return Result.error("请勿重复提交");
+            }
+
+            if (order.getProductId() == null) {
+                return Result.error(ResultCode.PRODUCT_NOT_FOUND);
+            }
+
+            Product product = productMapper.selectById(order.getProductId());
+            if (product == null) {
+                return Result.error(ResultCode.PRODUCT_NOT_FOUND);
+            }
+            if (product.getStatus() != null && product.getStatus() == 0) {
+                return Result.error(ResultCode.PRODUCT_OFF_SHELF);
+            }
+            if (product.getStock() != null && product.getStock() <= 0) {
+                return Result.error(ResultCode.PRODUCT_STOCK_NOT_ENOUGH);
             }
 
             boolean success = orderService.createOrder(order);

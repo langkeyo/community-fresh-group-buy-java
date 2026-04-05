@@ -13,6 +13,7 @@ import com.langkeyo.mapper.ProductMapper;
 import com.langkeyo.service.IOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
@@ -31,6 +32,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
+    @Transactional
     public boolean createOrder(Order order) {
         order.setId(IdUtil.getSnowflakeNextIdStr());
         order.setStatus(1);
@@ -49,6 +51,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         if (order.getTotalPrice() == null) {
             order.setTotalPrice(BigDecimal.ZERO);
+        }
+
+        if (order.getProductId() != null) {
+            int updated = productMapper.decreaseStock(order.getProductId());
+            if (updated == 0) {
+                return false;
+            }
         }
 
         return this.save(order);
