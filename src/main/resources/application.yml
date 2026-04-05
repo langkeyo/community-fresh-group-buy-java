@@ -7,6 +7,13 @@ spring:
   application:
     name: community-fresh-group-buy
 
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+
   # 数据源配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -104,3 +111,10 @@ knife4j:
   enable: true
   setting:
     language: zh_cn
+
+# DeepSeek 配置
+deepseek:
+  base-url: https://api.deepseek.com
+  api-key: ${DEEPSEEK_API_KEY:}
+  model: deepseek-chat
+  timeout-ms: 60000
