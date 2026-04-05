@@ -1,16 +1,19 @@
 package com.langkeyo.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.langkeyo.common.Result;
 import com.langkeyo.common.ResultCode;
 import com.langkeyo.dto.LoginResponseDTO;
 import com.langkeyo.dto.UserDTO;
 import com.langkeyo.entity.User;
 import com.langkeyo.service.IUserService;
+import com.langkeyo.utils.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -24,6 +27,8 @@ public class UserController {
 
     @Autowired
     private IUserService userService;
+    @Autowired
+    private JwtUtil jwtUtil;
 
     /**
      * 微信小程序登录
@@ -43,6 +48,23 @@ public class UserController {
             log.error("登录失败", e);
             return Result.error("登录失败: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/dev-login")
+    public Result<LoginResponseDTO> devLogin(@RequestParam(defaultValue = "1") Long userId) {
+        User user = userService.getById(userId);
+        if (user == null) {
+            return Result.error(ResultCode.USER_NOT_FOUND);
+        }
+
+        String token = jwtUtil.generateToken(user.getId(), user.getOpenid());
+
+        LoginResponseDTO result = new LoginResponseDTO();
+        UserDTO userDTO = BeanUtil.toBean(user, UserDTO.class);
+        result.setToken(token);
+        result.setUserInfo(userDTO);
+
+        return Result.success("登录成功", result);
     }
 
     /**
@@ -76,5 +98,11 @@ public class UserController {
     @GetMapping("/test")
     public Result<String> test() {
         return Result.success("后端接口正常运行！");
+    }
+
+    @GetMapping("/list")
+    public Result<List<User>> getUserList() {
+        List<User> list = userService.list();
+        return Result.success(list);
     }
 }
