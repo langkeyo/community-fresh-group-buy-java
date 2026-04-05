@@ -2,24 +2,33 @@ package com.langkeyo.controller;
 
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.langkeyo.common.Result;
 import com.langkeyo.dto.AiRecipeDTO;
 import com.langkeyo.dto.AiRecipeStepDTO;
 import com.langkeyo.dto.AiRecommendRespDTO;
+import com.langkeyo.entity.AiRecipeLibrary;
+import com.langkeyo.entity.AiRecommendReview;
+import com.langkeyo.mapper.AiRecipeLibraryMapper;
+import com.langkeyo.mapper.AiRecommendReviewMapper;
 import com.langkeyo.service.AiLlmService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/ai")
 @RequiredArgsConstructor
 public class AiController {
+    private static final Logger log = LoggerFactory.getLogger(AiController.class);
     private final AiLlmService aiLlmService;
+    private final AiRecommendReviewMapper aiRecommendReviewMapper;
+    private final AiRecipeLibraryMapper aiRecipeLibraryMapper;
 
     @PostMapping("/recommend")
     public Result<AiRecommendRespDTO> recommend(@RequestParam String query) {
@@ -76,10 +85,76 @@ public class AiController {
 
         AiRecommendRespDTO resp = new AiRecommendRespDTO();
         resp.setSource("AI");
+
+        JSONObject recipeObj = aiJson.getJSONObject("recipe");
+        // 兼容两种模型输出：
+        // 1) 嵌套：{ recipe: {...} }
+        // 2) 扁平：{ title, desc, tags, image, steps, disclaimer }
+        if (recipeObj == null || recipeObj.isEmpty()) {
+            recipeObj = new JSONObject();
+            recipeObj.set("title", aiJson.getStr("title", ""));
+            recipeObj.set("desc", aiJson.getStr("desc", ""));
+            recipeObj.set("tags", aiJson.getJSONArray("tags"));
+            recipeObj.set("image", aiJson.getStr("image", ""));
+            recipeObj.set("steps", aiJson.getJSONArray("steps"));
+        }
+        String recipeJson = recipeObj.toString();
+        log.info("recipeJson={}", recipeJson);
+
+        AiRecommendReview review = new AiRecommendReview();
+        review.setQueryText(query);
+        review.setSource("AI");
+        review.setRecipeJson(recipeJson);
+        review.setStatus("PENDING");
+        review.setCreatedAt(LocalDateTime.now());
+        aiRecommendReviewMapper.insert(review);
+
         resp.setDisclaimer(aiJson.getStr("disclaimer", "该菜谱为AI生成，仅供参考，请结合实际食材调整"));
         resp.setRecipe(recipe);
 
         return Result.success(resp);
+    }
+
+    @GetMapping("/review/list")
+    public Result<List<AiRecommendReview>> reviewList(@RequestParam(defaultValue = "PENDING") String status) {
+        LambdaQueryWrapper<AiRecommendReview> qw = new LambdaQueryWrapper<>();
+        qw.eq(AiRecommendReview::getStatus, status).orderByDesc(AiRecommendReview::getId);
+        return Result.success(aiRecommendReviewMapper.selectList(qw));
+    }
+
+    @PutMapping("/review/approve/{id}")
+    public Result<String> approve(@PathVariable Long id, @RequestParam(required = false) String reviewer) {
+        AiRecommendReview row = aiRecommendReviewMapper.selectById(id);
+        if (row == null) return Result.error("记录不存在");
+        row.setStatus("APPROVED");
+        row.setReviewer(reviewer);
+        row.setReviewedAt(LocalDateTime.now());
+        aiRecommendReviewMapper.updateById(row);
+
+        JSONObject recipeObj = JSONUtil.parseObj(row.getRecipeJson());
+
+        AiRecipeLibrary lib = new AiRecipeLibrary();
+        lib.setQueryText(row.getQueryText());
+        lib.setTitle(recipeObj.getStr("title", "未命名菜谱"));
+        lib.setTagsJson(JSONUtil.toJsonStr(recipeObj.get("tags")));
+        lib.setRecipeJson(row.getRecipeJson());
+        lib.setSource(row.getSource());
+        lib.setCreatedAt(LocalDateTime.now());
+        aiRecipeLibraryMapper.insert(lib);
+
+        return Result.success("审核通过");
+    }
+
+    @PutMapping("/review/reject/{id}")
+    public Result<String> reject(@PathVariable Long id, @RequestParam(required = false) String reviewer, @RequestParam(required = false) String remark) {
+        AiRecommendReview row = aiRecommendReviewMapper.selectById(id);
+        if (row == null) return Result.error("记录不存在");
+        row.setStatus("REJECTED");
+        row.setReviewer(reviewer == null ? "admin" : reviewer);
+        row.setReviewRemark(remark == null ? "" : remark);
+        row.setReviewedAt(LocalDateTime.now());
+        aiRecommendReviewMapper.updateById(row);
+        return Result.success("已驳回");
     }
 
     @PostMapping("/test-llm")
