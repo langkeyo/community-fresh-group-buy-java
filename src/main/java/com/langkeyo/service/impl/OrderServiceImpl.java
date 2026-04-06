@@ -3,6 +3,7 @@ package com.langkeyo.service.impl;
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.langkeyo.dto.LeaderWorkbenchDTO;
 import com.langkeyo.dto.OpenGroupItemDTO;
 import com.langkeyo.dto.OrderListItemDTO;
 import com.langkeyo.entity.Order;
@@ -196,6 +197,71 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return orders.stream()
                 .map(order -> toOrderListItemDTO(order, productNameMap))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public LeaderWorkbenchDTO getLeaderWorkbench(Long pickPointId) {
+        LeaderWorkbenchDTO dto = new LeaderWorkbenchDTO();
+        if (pickPointId == null) {
+            dto.setPendingCount(0);
+            dto.setPickedTodayCount(0);
+            return dto;
+        }
+
+        LambdaQueryWrapper<Order> pendingQw = new LambdaQueryWrapper<>();
+        pendingQw.eq(Order::getPickPointId, pickPointId)
+                .eq(Order::getStatus, 2)
+                .orderByDesc(Order::getCreateTime);
+        List<Order> pendingOrders = this.list(pendingQw);
+
+        LambdaQueryWrapper<Order> recentPickedQw = new LambdaQueryWrapper<>();
+        recentPickedQw.eq(Order::getPickPointId, pickPointId)
+                .eq(Order::getStatus, 3)
+                .orderByDesc(Order::getUpdateTime)
+                .last("limit 5");
+        List<Order> recentPickedOrders = this.list(recentPickedQw);
+
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayEnd = LocalDate.now().atTime(LocalTime.MAX);
+        LambdaQueryWrapper<Order> todayPickedQw = new LambdaQueryWrapper<>();
+        todayPickedQw.eq(Order::getPickPointId, pickPointId)
+                .eq(Order::getStatus, 3)
+                .ge(Order::getUpdateTime, todayStart)
+                .le(Order::getUpdateTime, todayEnd);
+        int pickedTodayCount = Math.toIntExact(this.count(todayPickedQw));
+
+        Set<Long> productIds = new HashSet<>();
+        for (Order item : pendingOrders) {
+            if (item.getProductId() != null) {
+                productIds.add(item.getProductId());
+            }
+        }
+        for (Order item : recentPickedOrders) {
+            if (item.getProductId() != null) {
+                productIds.add(item.getProductId());
+            }
+        }
+
+        Map<Long, String> productNameMap = new HashMap<>();
+        if (!productIds.isEmpty()) {
+            List<Product> products = productMapper.selectNameListByIds(List.copyOf(productIds));
+            for (Product product : products) {
+                productNameMap.put(product.getId(), product.getName());
+            }
+        }
+
+        List<OrderListItemDTO> pendingDtos = pendingOrders.stream()
+                .map(order -> toOrderListItemDTO(order, productNameMap))
+                .collect(Collectors.toList());
+        List<OrderListItemDTO> recentDtos = recentPickedOrders.stream()
+                .map(order -> toOrderListItemDTO(order, productNameMap))
+                .collect(Collectors.toList());
+
+        dto.setPendingCount(pendingDtos.size());
+        dto.setPickedTodayCount(pickedTodayCount);
+        dto.setPendingOrders(pendingDtos);
+        dto.setRecentPickedOrders(recentDtos);
+        return dto;
     }
 
     @Override

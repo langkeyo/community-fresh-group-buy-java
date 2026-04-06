@@ -3,6 +3,7 @@ package com.langkeyo.controller;
 import com.langkeyo.common.Result;
 import com.langkeyo.common.ResultCode;
 import com.langkeyo.config.RabbitConfig;
+import com.langkeyo.dto.LeaderWorkbenchDTO;
 import com.langkeyo.dto.OpenGroupItemDTO;
 import com.langkeyo.dto.OrderListItemDTO;
 import com.langkeyo.entity.Order;
@@ -131,6 +132,17 @@ public class OrderController {
         }
         List<OrderListItemDTO> orders = orderService.getOrdersByPickPointAndStatus(pickPointId, status);
         return Result.success(orders);
+    }
+
+    @GetMapping("/leader/workbench")
+    public Result<LeaderWorkbenchDTO> getLeaderWorkbench(@RequestParam Long leaderId,
+                                                         @RequestParam Long pickPointId) {
+        User leader = userService.getById(leaderId);
+        if (leader == null || leader.getIsLeader() == null || !leader.getIsLeader()) {
+            return Result.error("非团长无权限");
+        }
+        LeaderWorkbenchDTO data = orderService.getLeaderWorkbench(pickPointId);
+        return Result.success(data);
     }
 
     @GetMapping("/group/open")

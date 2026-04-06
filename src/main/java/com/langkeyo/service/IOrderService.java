@@ -1,6 +1,7 @@
 package com.langkeyo.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.langkeyo.dto.LeaderWorkbenchDTO;
 import com.langkeyo.dto.OpenGroupItemDTO;
 import com.langkeyo.entity.Order;
 import com.langkeyo.dto.OrderListItemDTO;
@@ -33,6 +34,11 @@ public interface IOrderService extends IService<Order> {
      * 团长侧：按自提点与状态筛选订单
      */
     List<OrderListItemDTO> getOrdersByPickPointAndStatus(Long pickPointId, Integer status);
+
+    /**
+     * 团长工作台：待核销数、今日核销数、最近核销记录
+     */
+    LeaderWorkbenchDTO getLeaderWorkbench(Long pickPointId);
 
     /**
      * 更新订单状态
