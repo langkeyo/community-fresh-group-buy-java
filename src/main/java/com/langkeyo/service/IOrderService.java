@@ -25,9 +25,9 @@ public interface IOrderService extends IService<Order> {
     OrderListItemDTO getOrderDetailById(String orderId);
 
     /**
-     * 管理端：查询全部订单，可按状态筛选
+     * 管理端：查询全部订单，可按状态/自提点/时间范围筛选
      */
-    List<OrderListItemDTO> getAllOrders(Integer status);
+    List<OrderListItemDTO> getAllOrders(Integer status, Long pickPointId, String startTime, String endTime);
 
     /**
      * 团长侧：按自提点与状态筛选订单

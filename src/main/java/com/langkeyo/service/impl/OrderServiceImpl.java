@@ -17,8 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,6 +35,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private PickPointMapper pickPointMapper;
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Override
     @Transactional
@@ -121,11 +125,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
 
     @Override
-    public List<OrderListItemDTO> getAllOrders(Integer status) {
+    public List<OrderListItemDTO> getAllOrders(Integer status, Long pickPointId, String startTime, String endTime) {
         LambdaQueryWrapper<Order> queryWrapper = new LambdaQueryWrapper<>();
         if (status != null) {
             queryWrapper.eq(Order::getStatus, status);
         }
+        if (pickPointId != null) {
+            queryWrapper.eq(Order::getPickPointId, pickPointId);
+        }
+
+        LocalDateTime start = parseStartTime(startTime);
+        LocalDateTime end = parseEndTime(endTime);
+        if (start != null) {
+            queryWrapper.ge(Order::getCreateTime, start);
+        }
+        if (end != null) {
+            queryWrapper.le(Order::getCreateTime, end);
+        }
+
         queryWrapper.orderByDesc(Order::getCreateTime);
 
         List<Order> orders = this.list(queryWrapper);
@@ -300,6 +317,36 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         for (Order row : grouped) {
             baseMapper.updateOrderStatus(row.getId(), 2);
+        }
+    }
+
+    private LocalDateTime parseStartTime(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        String text = value.trim();
+        try {
+            if (text.length() == 10) {
+                return LocalDate.parse(text, DATE_FORMATTER).atStartOfDay();
+            }
+            return LocalDateTime.parse(text, DATE_TIME_FORMATTER);
+        } catch (DateTimeParseException ignored) {
+            return null;
+        }
+    }
+
+    private LocalDateTime parseEndTime(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        String text = value.trim();
+        try {
+            if (text.length() == 10) {
+                return LocalDate.parse(text, DATE_FORMATTER).atTime(LocalTime.MAX);
+            }
+            return LocalDateTime.parse(text, DATE_TIME_FORMATTER);
+        } catch (DateTimeParseException ignored) {
+            return null;
         }
     }
 }
