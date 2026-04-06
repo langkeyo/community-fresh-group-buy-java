@@ -33,9 +33,14 @@ public class AiLlmService {
                                 + "\"desc\":\"\","
                                 + "\"tags\":[\"\"],"
                                 + "\"image\":\"\","
+                                + "\"ingredients\":[{\"name\":\"\",\"amount\":\"\",\"unit\":\"\"}],"
                                 + "\"steps\":[{\"step\":1,\"content\":\"\"}],"
                                 + "\"disclaimer\":\"该菜谱为AI生成，仅供参考，请结合实际食材调整\""
-                                + "}"));
+                                + "}。"
+                                + "image字段必须返回可直接访问的https图片直链，优先使用loremflickr，格式示例："
+                                + "https://loremflickr.com/800/600/food,{关键词}?lock={1-9999整数}。"
+                                + "禁止返回网页链接、相对路径、base64或需要鉴权的地址。"
+                ));
         messages.add(new JSONObject().set("role", "user").set("content", userPrompt));
         body.set("messages", messages);
 

@@ -10,5 +10,6 @@ public class AiRecipeDTO {
     private String desc;
     private List<String> tags;
     private String image;
+    private List<AiIngredientDTO> ingredients;
     private List<AiRecipeStepDTO> steps;
 }

@@ -6,6 +6,7 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.langkeyo.common.Result;
+import com.langkeyo.dto.AiIngredientDTO;
 import com.langkeyo.dto.AiRecipeDTO;
 import com.langkeyo.dto.AiRecipeStepDTO;
 import com.langkeyo.dto.AiRecommendRespDTO;
@@ -54,6 +55,12 @@ public class AiController {
             recipe.setDesc("来自词典的稳定推荐结果");
             recipe.setTags(Arrays.asList("家常", "快手", "稳定命中"));
             recipe.setImage("https://loremflickr.com/500/300/tomato,egg?lock=301");
+            recipe.setIngredients(List.of(
+                    ingredient("番茄", "2", "个"),
+                    ingredient("鸡蛋", "3", "个"),
+                    ingredient("食用油", "1", "勺"),
+                    ingredient("食盐", "适量", "")
+            ));
             recipe.setSteps(List.of(s1, s2, s3));
 
             AiRecommendRespDTO resp = new AiRecommendRespDTO();
@@ -99,8 +106,14 @@ public class AiController {
             recipeObj.set("desc", aiJson.getStr("desc", ""));
             recipeObj.set("tags", aiJson.getJSONArray("tags"));
             recipeObj.set("image", aiJson.getStr("image", ""));
+            recipeObj.set("ingredients", aiJson.getJSONArray("ingredients"));
             recipeObj.set("steps", aiJson.getJSONArray("steps"));
         }
+        JSONArray ingredientArr = aiJson.getJSONArray("ingredients");
+        if ((ingredientArr == null || ingredientArr.isEmpty()) && recipeObj != null) {
+            ingredientArr = recipeObj.getJSONArray("ingredients");
+        }
+        recipe.setIngredients(parseIngredients(ingredientArr));
         String recipeJson = recipeObj.toString();
         log.info("recipeJson={}", recipeJson);
 
@@ -186,6 +199,7 @@ public class AiController {
             recipeObj.set("desc", aiJson.getStr("desc", ""));
             recipeObj.set("tags", aiJson.getJSONArray("tags"));
             recipeObj.set("image", aiJson.getStr("image", ""));
+            recipeObj.set("ingredients", aiJson.getJSONArray("ingredients"));
             recipeObj.set("steps", aiJson.getJSONArray("steps"));
         }
 
@@ -213,6 +227,32 @@ public class AiController {
             if (q.contains(w)) return true;
         }
         return false;
+    }
+
+    private List<AiIngredientDTO> parseIngredients(JSONArray ingredientArr) {
+        if (ingredientArr == null || ingredientArr.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<AiIngredientDTO> list = new ArrayList<>();
+        for (Object obj : ingredientArr) {
+            JSONObject item = (JSONObject) obj;
+            AiIngredientDTO dto = new AiIngredientDTO();
+            dto.setName(item.getStr("name", ""));
+            dto.setAmount(item.getStr("amount", ""));
+            dto.setUnit(item.getStr("unit", ""));
+            if (dto.getName() != null && !dto.getName().trim().isEmpty()) {
+                list.add(dto);
+            }
+        }
+        return list;
+    }
+
+    private AiIngredientDTO ingredient(String name, String amount, String unit) {
+        AiIngredientDTO dto = new AiIngredientDTO();
+        dto.setName(name);
+        dto.setAmount(amount);
+        dto.setUnit(unit);
+        return dto;
     }
 
     private void ensureLibraryRow(AiRecommendReview row) {
