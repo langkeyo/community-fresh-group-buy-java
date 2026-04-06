@@ -14,7 +14,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 用户控制器
@@ -104,5 +103,19 @@ public class UserController {
     public Result<List<User>> getUserList() {
         List<User> list = userService.list();
         return Result.success(list);
+    }
+
+    @PutMapping("/leader/{id}")
+    public Result<String> updateLeader(@PathVariable Long id, @RequestParam Boolean isLeader) {
+        User user = userService.getById(id);
+        if (user == null) {
+            return Result.error(ResultCode.USER_NOT_FOUND);
+        }
+        user.setIsLeader(Boolean.TRUE.equals(isLeader));
+        boolean ok = userService.updateById(user);
+        if (!ok) {
+            return Result.error("团长状态更新失败");
+        }
+        return Result.success("团长状态更新成功");
     }
 }

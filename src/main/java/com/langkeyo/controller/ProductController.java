@@ -8,12 +8,9 @@ import com.langkeyo.entity.Product;
 import com.langkeyo.mapper.ProductMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,6 +42,92 @@ public class ProductController {
             return Result.error(ResultCode.PRODUCT_NOT_FOUND);
         }
         return Result.success(toItemDTO(product));
+    }
+
+    @GetMapping("/admin/list")
+    public Result<List<ProductItemDTO>> adminList(@RequestParam(required = false) String keyword,
+                                                  @RequestParam(required = false) Integer status) {
+        QueryWrapper<Product> wrapper = new QueryWrapper<>();
+        wrapper.eq("deleted", 0);
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like("name", keyword.trim());
+        }
+        if (status != null) {
+            wrapper.eq("status", status);
+        }
+        wrapper.orderByDesc("id");
+        List<ProductItemDTO> data = productMapper.selectList(wrapper).stream()
+                .map(this::toItemDTO)
+                .collect(Collectors.toList());
+        return Result.success(data);
+    }
+
+    @PostMapping("/admin/create")
+    public Result<String> adminCreate(@RequestBody Product payload) {
+        if (!StringUtils.hasText(payload.getName())) {
+            return Result.error(ResultCode.PARAM_IS_BLANK);
+        }
+        payload.setId(null);
+        payload.setStatus(payload.getStatus() == null ? 1 : payload.getStatus());
+        payload.setDeleted(0);
+        LocalDateTime now = LocalDateTime.now();
+        payload.setCreateTime(now);
+        payload.setUpdateTime(now);
+        boolean ok = productMapper.insert(payload) > 0;
+        if (!ok) {
+            return Result.error("商品创建失败");
+        }
+        return Result.success("商品创建成功");
+    }
+
+    @PutMapping("/admin/update/{id}")
+    public Result<String> adminUpdate(@PathVariable Long id, @RequestBody Product payload) {
+        Product db = productMapper.selectById(id);
+        if (db == null || (db.getDeleted() != null && db.getDeleted() == 1)) {
+            return Result.error(ResultCode.PRODUCT_NOT_FOUND);
+        }
+        payload.setId(id);
+        payload.setCreateTime(db.getCreateTime());
+        payload.setDeleted(db.getDeleted() == null ? 0 : db.getDeleted());
+        payload.setUpdateTime(LocalDateTime.now());
+        boolean ok = productMapper.updateById(payload) > 0;
+        if (!ok) {
+            return Result.error("商品更新失败");
+        }
+        return Result.success("商品更新成功");
+    }
+
+    @PutMapping("/admin/status/{id}")
+    public Result<String> adminUpdateStatus(@PathVariable Long id, @RequestParam Integer status) {
+        Product db = productMapper.selectById(id);
+        if (db == null || (db.getDeleted() != null && db.getDeleted() == 1)) {
+            return Result.error(ResultCode.PRODUCT_NOT_FOUND);
+        }
+        db.setStatus(status);
+        db.setUpdateTime(LocalDateTime.now());
+        boolean ok = productMapper.updateById(db) > 0;
+        if (!ok) {
+            return Result.error("商品状态更新失败");
+        }
+        return Result.success("商品状态更新成功");
+    }
+
+    @PutMapping("/admin/stock/{id}")
+    public Result<String> adminUpdateStock(@PathVariable Long id, @RequestParam Integer stock) {
+        Product db = productMapper.selectById(id);
+        if (db == null || (db.getDeleted() != null && db.getDeleted() == 1)) {
+            return Result.error(ResultCode.PRODUCT_NOT_FOUND);
+        }
+        if (stock == null || stock < 0) {
+            return Result.error(ResultCode.PARAM_ERROR);
+        }
+        db.setStock(stock);
+        db.setUpdateTime(LocalDateTime.now());
+        boolean ok = productMapper.updateById(db) > 0;
+        if (!ok) {
+            return Result.error("库存更新失败");
+        }
+        return Result.success("库存更新成功");
     }
 
     private ProductItemDTO toItemDTO(Product product) {
