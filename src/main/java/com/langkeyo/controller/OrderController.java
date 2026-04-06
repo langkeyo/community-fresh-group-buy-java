@@ -3,6 +3,7 @@ package com.langkeyo.controller;
 import com.langkeyo.common.Result;
 import com.langkeyo.common.ResultCode;
 import com.langkeyo.config.RabbitConfig;
+import com.langkeyo.dto.OpenGroupItemDTO;
 import com.langkeyo.dto.OrderListItemDTO;
 import com.langkeyo.entity.Order;
 import com.langkeyo.entity.Product;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -64,6 +66,20 @@ public class OrderController {
             }
             if (product.getStock() != null && product.getStock() <= 0) {
                 return Result.error(ResultCode.PRODUCT_STOCK_NOT_ENOUGH);
+            }
+
+            if (order.getGroupBuyId() != null && !order.getGroupBuyId().trim().isEmpty()) {
+                Optional<OpenGroupItemDTO> openGroup = orderService.getOpenGroup(
+                        order.getGroupBuyId(),
+                        order.getProductId(),
+                        order.getPickPointId()
+                );
+                if (openGroup.isPresent()) {
+                    OpenGroupItemDTO group = openGroup.get();
+                    if (group.getCurrentCount() >= group.getTargetCount()) {
+                        return Result.error("该拼团已满，请选择其他拼团");
+                    }
+                }
             }
 
             boolean success = orderService.createOrder(order);
@@ -112,6 +128,13 @@ public class OrderController {
         }
         List<OrderListItemDTO> orders = orderService.getOrdersByPickPointAndStatus(pickPointId, status);
         return Result.success(orders);
+    }
+
+    @GetMapping("/group/open")
+    public Result<List<OpenGroupItemDTO>> getOpenGroups(@RequestParam Long productId,
+                                                        @RequestParam Long pickPointId) {
+        List<OpenGroupItemDTO> groups = orderService.listOpenGroups(productId, pickPointId);
+        return Result.success(groups);
     }
 
     @GetMapping("/{orderId}")

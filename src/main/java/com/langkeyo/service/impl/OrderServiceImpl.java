@@ -3,6 +3,7 @@ package com.langkeyo.service.impl;
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.langkeyo.dto.OpenGroupItemDTO;
 import com.langkeyo.dto.OrderListItemDTO;
 import com.langkeyo.entity.Order;
 import com.langkeyo.entity.PickPoint;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -53,6 +55,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             order.setTotalPrice(BigDecimal.ZERO);
         }
 
+        if (order.getGroupBuyId() == null || order.getGroupBuyId().trim().isEmpty()) {
+            order.setGroupBuyId("GB2-" + IdUtil.fastSimpleUUID());
+        }
+
         if (order.getProductId() != null) {
             int updated = productMapper.decreaseStock(order.getProductId());
             if (updated == 0) {
@@ -60,7 +66,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             }
         }
 
-        return this.save(order);
+        boolean saved = this.save(order);
+        if (!saved) {
+            return false;
+        }
+        tryAutoCompleteGroup(order.getGroupBuyId(), order.getProductId(), order.getPickPointId());
+        return true;
     }
 
     @Override
@@ -187,6 +198,56 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return baseMapper.updateOrderStatus(orderId, status) > 0;
     }
 
+    @Override
+    public List<OpenGroupItemDTO> listOpenGroups(Long productId, Long pickPointId) {
+        LambdaQueryWrapper<Order> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(productId != null, Order::getProductId, productId);
+        queryWrapper.eq(pickPointId != null, Order::getPickPointId, pickPointId);
+        queryWrapper.eq(Order::getStatus, 1);
+        queryWrapper.isNotNull(Order::getGroupBuyId);
+        queryWrapper.orderByDesc(Order::getCreateTime);
+
+        List<Order> orders = this.list(queryWrapper);
+        Map<String, List<Order>> grouped = orders.stream()
+                .filter(o -> o.getGroupBuyId() != null && !o.getGroupBuyId().trim().isEmpty())
+                .collect(Collectors.groupingBy(Order::getGroupBuyId, LinkedHashMap::new, Collectors.toList()));
+
+        List<OpenGroupItemDTO> result = new ArrayList<>();
+        for (Map.Entry<String, List<Order>> entry : grouped.entrySet()) {
+            String groupId = entry.getKey();
+            List<Order> list = entry.getValue();
+            int current = list.size();
+            int target = parseTargetCount(groupId);
+            if (current >= target) {
+                continue;
+            }
+
+            OpenGroupItemDTO dto = new OpenGroupItemDTO();
+            dto.setGroupBuyId(groupId);
+            dto.setCurrentCount(current);
+            dto.setTargetCount(target);
+            LocalDateTime latest = list.stream()
+                    .map(Order::getCreateTime)
+                    .filter(Objects::nonNull)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(null);
+            dto.setLatestCreateTime(latest == null ? "" : latest.format(DATE_TIME_FORMATTER));
+            result.add(dto);
+        }
+        return result;
+    }
+
+    @Override
+    public Optional<OpenGroupItemDTO> getOpenGroup(String groupBuyId, Long productId, Long pickPointId) {
+        if (groupBuyId == null || groupBuyId.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        List<OpenGroupItemDTO> list = listOpenGroups(productId, pickPointId);
+        return list.stream()
+                .filter(item -> groupBuyId.equals(item.getGroupBuyId()))
+                .findFirst();
+    }
+
     private OrderListItemDTO toOrderListItemDTO(Order order, Map<Long, String> productNameMap) {
         OrderListItemDTO dto = new OrderListItemDTO();
         dto.setId(order.getId());
@@ -212,5 +273,33 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         dto.setPickPointAddress(pickPointAddress);
         dto.setCreateTime(order.getCreateTime() == null ? "" : order.getCreateTime().format(DATE_TIME_FORMATTER));
         return dto;
+    }
+
+    private int parseTargetCount(String groupBuyId) {
+        if (groupBuyId == null) return 2;
+        if (groupBuyId.startsWith("GB3-")) return 3;
+        if (groupBuyId.startsWith("GB2-")) return 2;
+        return 2;
+    }
+
+    private void tryAutoCompleteGroup(String groupBuyId, Long productId, Long pickPointId) {
+        if (groupBuyId == null || groupBuyId.trim().isEmpty()) {
+            return;
+        }
+        int target = parseTargetCount(groupBuyId);
+
+        LambdaQueryWrapper<Order> qw = new LambdaQueryWrapper<>();
+        qw.eq(Order::getGroupBuyId, groupBuyId);
+        qw.eq(productId != null, Order::getProductId, productId);
+        qw.eq(pickPointId != null, Order::getPickPointId, pickPointId);
+        qw.eq(Order::getStatus, 1);
+        List<Order> grouped = this.list(qw);
+        if (grouped.size() < target) {
+            return;
+        }
+
+        for (Order row : grouped) {
+            baseMapper.updateOrderStatus(row.getId(), 2);
+        }
     }
 }

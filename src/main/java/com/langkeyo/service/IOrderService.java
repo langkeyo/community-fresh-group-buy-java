@@ -1,10 +1,12 @@
 package com.langkeyo.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.langkeyo.dto.OpenGroupItemDTO;
 import com.langkeyo.entity.Order;
 import com.langkeyo.dto.OrderListItemDTO;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface IOrderService extends IService<Order> {
     /**
@@ -36,4 +38,14 @@ public interface IOrderService extends IService<Order> {
      * 更新订单状态
      */
     boolean updateOrderStatus(String orderId, Integer status);
+
+    /**
+     * 查询可加入的拼团列表
+     */
+    List<OpenGroupItemDTO> listOpenGroups(Long productId, Long pickPointId);
+
+    /**
+     * 查询拼团状态（仅进行中）
+     */
+    Optional<OpenGroupItemDTO> getOpenGroup(String groupBuyId, Long productId, Long pickPointId);
 }
