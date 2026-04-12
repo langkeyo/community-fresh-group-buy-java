@@ -2,6 +2,9 @@ package com.langkeyo.dto;
 
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 public class SystemConfigDTO {
     private String noticeText;
@@ -9,4 +12,5 @@ public class SystemConfigDTO {
     private String serviceWechat;
     private String serviceHours;
     private String serviceTerms;
+    private List<RecommendMenuItemDTO> recommendMenus = new ArrayList<>();
 }
