@@ -31,7 +31,7 @@ public class PickPointController {
         }
         List<PickPoint> points = pickPointMapper.selectList(wrapper);
         List<PickPointItemDTO> data = points.stream()
-                .map(item -> new PickPointItemDTO(item.getId(), item.getName(), item.getAddress()))
+                .map(this::toDTO)
                 .collect(Collectors.toList());
         return Result.success(data);
     }
@@ -42,6 +42,19 @@ public class PickPointController {
         if (point == null) {
             return Result.error("自提点不存在");
         }
-        return Result.success(new PickPointItemDTO(point.getId(), point.getName(), point.getAddress()));
+        return Result.success(toDTO(point));
+    }
+
+    private PickPointItemDTO toDTO(PickPoint point) {
+        PickPointItemDTO dto = new PickPointItemDTO();
+        dto.setId(point.getId());
+        dto.setName(point.getName());
+        dto.setAddress(point.getAddress());
+        dto.setLeaderName(point.getLeaderName());
+        dto.setPhone(point.getPhone());
+        dto.setCreateTime(point.getCreateTime());
+        dto.setUpdateTime(point.getUpdateTime());
+        dto.setDeleted(point.getDeleted());
+        return dto;
     }
 }
