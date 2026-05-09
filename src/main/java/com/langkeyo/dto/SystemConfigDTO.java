@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class SystemConfigDTO {
@@ -13,4 +14,5 @@ public class SystemConfigDTO {
     private String serviceHours;
     private String serviceTerms;
     private List<RecommendMenuItemDTO> recommendMenus = new ArrayList<>();
+    private Map<String, Object> extendedSettings;
 }

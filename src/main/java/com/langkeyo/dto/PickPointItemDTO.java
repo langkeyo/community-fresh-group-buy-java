@@ -15,6 +15,8 @@ public class PickPointItemDTO {
     private String address;
     private String leaderName;
     private String phone;
+    private Double latitude;
+    private Double longitude;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private Integer deleted;

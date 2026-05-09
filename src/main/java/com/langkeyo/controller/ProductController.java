@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/product")
 public class ProductController {
+    private static final int PRODUCT_IMAGES_MAX_LENGTH = 1024;
+
     @Autowired
     private ProductMapper productMapper;
 
@@ -67,6 +69,10 @@ public class ProductController {
         if (!StringUtils.hasText(payload.getName())) {
             return Result.error(ResultCode.PARAM_IS_BLANK);
         }
+        Result<String> imageCheck = validateImagesField(payload.getImages());
+        if (imageCheck != null) {
+            return imageCheck;
+        }
         payload.setId(null);
         payload.setStatus(payload.getStatus() == null ? 1 : payload.getStatus());
         payload.setDeleted(0);
@@ -85,6 +91,10 @@ public class ProductController {
         Product db = productMapper.selectById(id);
         if (db == null || (db.getDeleted() != null && db.getDeleted() == 1)) {
             return Result.error(ResultCode.PRODUCT_NOT_FOUND);
+        }
+        Result<String> imageCheck = validateImagesField(payload.getImages());
+        if (imageCheck != null) {
+            return imageCheck;
         }
         payload.setId(id);
         payload.setCreateTime(db.getCreateTime());
@@ -142,5 +152,19 @@ public class ProductController {
         dto.setImages(product.getImages());
         dto.setStatus(product.getStatus());
         return dto;
+    }
+
+    private Result<String> validateImagesField(String images) {
+        if (!StringUtils.hasText(images)) {
+            return null;
+        }
+        String value = images.trim();
+        if (value.startsWith("data:image/")) {
+            return Result.error("图片字段仅支持URL，不支持base64内容");
+        }
+        if (value.length() > PRODUCT_IMAGES_MAX_LENGTH) {
+            return Result.error("图片URL过长，请使用短链接或图床地址");
+        }
+        return null;
     }
 }

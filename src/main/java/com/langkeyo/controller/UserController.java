@@ -50,7 +50,12 @@ public class UserController {
     }
 
     @PostMapping("/dev-login")
-    public Result<LoginResponseDTO> devLogin(@RequestParam(defaultValue = "1") Long userId) {
+    public Result<LoginResponseDTO> devLogin(@RequestParam(required = false) Long userId,
+                                             @RequestParam(required = false) String code) {
+        // 兼容管理端当前调用：/api/user/dev-login?code=admin-test-code
+        if (userId == null) {
+            userId = resolveDevUserId(code);
+        }
         User user = userService.getById(userId);
         if (user == null) {
             return Result.error(ResultCode.USER_NOT_FOUND);
@@ -64,6 +69,18 @@ public class UserController {
         result.setUserInfo(userDTO);
 
         return Result.success("登录成功", result);
+    }
+
+    private Long resolveDevUserId(String code) {
+        if (!StringUtils.hasText(code)) {
+            return 1L;
+        }
+        String text = code.trim();
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException ignored) {
+            return 1L;
+        }
     }
 
     /**

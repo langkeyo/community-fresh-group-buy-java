@@ -23,6 +23,12 @@ public class PickPoint {
     @TableField("phone")
     private String phone;
 
+    @TableField("latitude")
+    private Double latitude;
+
+    @TableField("longitude")
+    private Double longitude;
+
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
