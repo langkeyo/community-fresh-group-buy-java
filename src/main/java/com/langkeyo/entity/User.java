@@ -47,11 +47,20 @@ public class User implements Serializable {
     @TableField("mobile")
     private String mobile;
 
+    @TableField("login_name")
+    private String loginName;
+
+    @TableField("password_hash")
+    private String passwordHash;
+
     /**
      * 是否为团长 (0:普通用户 1:团长)
      */
     @TableField("is_leader")
     private Boolean isLeader;
+
+    @TableField("admin_role")
+    private String adminRole;
 
     /**
      * 创建时间

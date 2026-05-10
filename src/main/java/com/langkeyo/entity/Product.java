@@ -38,6 +38,15 @@ public class Product {
     @TableField("status")
     private Integer status;
 
+    @TableField("group_open")
+    private Integer groupOpen;
+
+    @TableField("group_start_time")
+    private LocalDateTime groupStartTime;
+
+    @TableField("group_end_time")
+    private LocalDateTime groupEndTime;
+
     @TableField("create_time")
     private LocalDateTime createTime;
 

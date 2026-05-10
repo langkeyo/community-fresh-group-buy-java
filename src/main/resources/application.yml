@@ -118,3 +118,7 @@ deepseek:
   api-key: ${DEEPSEEK_API_KEY:}
   model: deepseek-chat
   timeout-ms: 60000
+
+app:
+  admin:
+    recovery-key: local-recover-2026

@@ -6,9 +6,12 @@ import com.langkeyo.config.RabbitConfig;
 import com.langkeyo.dto.LeaderWorkbenchDTO;
 import com.langkeyo.dto.OpenGroupItemDTO;
 import com.langkeyo.dto.OrderListItemDTO;
+import com.langkeyo.dto.OrderRefundReqDTO;
+import com.langkeyo.entity.Coupon;
 import com.langkeyo.entity.Order;
 import com.langkeyo.entity.Product;
 import com.langkeyo.entity.User;
+import com.langkeyo.mapper.CouponMapper;
 import com.langkeyo.mapper.ProductMapper;
 import com.langkeyo.service.IOrderService;
 import com.langkeyo.service.IUserService;
@@ -23,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/order")
@@ -32,6 +37,9 @@ public class OrderController {
 
     @Autowired
     private ProductMapper productMapper;
+
+    @Autowired
+    private CouponMapper couponMapper;
 
     @Autowired
     private IUserService userService;
@@ -65,6 +73,16 @@ public class OrderController {
             if (product.getStatus() != null && product.getStatus() == 0) {
                 return Result.error(ResultCode.PRODUCT_OFF_SHELF);
             }
+            if (product.getGroupOpen() == null || product.getGroupOpen() != 1) {
+                return Result.error("当前团购未开团");
+            }
+            LocalDateTime now = LocalDateTime.now();
+            if (product.getGroupStartTime() != null && now.isBefore(product.getGroupStartTime())) {
+                return Result.error("未到开团时间");
+            }
+            if (product.getGroupEndTime() != null && now.isAfter(product.getGroupEndTime())) {
+                return Result.error("团购活动已结束");
+            }
             if (product.getStock() != null && product.getStock() <= 0) {
                 return Result.error(ResultCode.PRODUCT_STOCK_NOT_ENOUGH);
             }
@@ -83,6 +101,38 @@ public class OrderController {
                 }
             }
 
+            if (order.getPayMethod() == null || order.getPayMethod().trim().isEmpty()) {
+                order.setPayMethod("WECHAT");
+            }
+
+            if (order.getCouponId() != null && !order.getCouponId().trim().isEmpty()) {
+                Coupon coupon = couponMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Coupon>()
+                        .eq("code", order.getCouponId().trim())
+                        .last("limit 1"));
+                if (coupon == null) {
+                    return Result.error("优惠券不存在");
+                }
+                if (coupon.getStatus() == null || coupon.getStatus() != 1) {
+                    return Result.error("优惠券未启用");
+                }
+                if (coupon.getStartTime() != null && now.isBefore(coupon.getStartTime())) {
+                    return Result.error("优惠券未生效");
+                }
+                if (coupon.getEndTime() != null && now.isAfter(coupon.getEndTime())) {
+                    return Result.error("优惠券已过期");
+                }
+                BigDecimal orderAmount = order.getTotalPrice() == null ? BigDecimal.ZERO : order.getTotalPrice();
+                BigDecimal minSpend = coupon.getMinimumSpend() == null ? BigDecimal.ZERO : coupon.getMinimumSpend();
+                if (orderAmount.compareTo(minSpend) < 0) {
+                    return Result.error("订单金额未达到优惠门槛");
+                }
+                order.setCouponId(coupon.getCode());
+                order.setCouponTitle(coupon.getTitle());
+                order.setCouponAmount(coupon.getDiscountAmount() == null ? BigDecimal.ZERO : coupon.getDiscountAmount());
+                BigDecimal finalAmount = orderAmount.subtract(order.getCouponAmount());
+                order.setTotalPrice(finalAmount.max(BigDecimal.ZERO));
+            }
+
             boolean success = orderService.createOrder(order);
             if (success) {
                 Map<String, Object> msg = new HashMap<>();
@@ -94,7 +144,7 @@ public class OrderController {
 
                 rabbitTemplate.convertAndSend(RabbitConfig.ORDER_EVENT_EXCHANGE, RabbitConfig.ORDER_CREATED_ROUTING_KEY, msg);
 
-                return Result.success("订单创建成功");
+                return Result.success(order.getId());
             }
             return Result.error(ResultCode.ORDER_CREATE_FAIL);
         } catch (InterruptedException e) {
@@ -206,5 +256,35 @@ public class OrderController {
         }
 
         return Result.success("核销成功");
+    }
+
+    @PutMapping("/refund/{orderId}")
+    public Result<String> refundOrder(@PathVariable String orderId,
+                                      @RequestBody OrderRefundReqDTO req) {
+        Order order = orderService.getById(orderId);
+        if (order == null) {
+            return Result.error(ResultCode.ORDER_NOT_FOUND);
+        }
+        if (order.getStatus() == null || order.getStatus() == -1) {
+            return Result.error("订单已退款或状态不支持退款");
+        }
+        if (req == null || req.getAmount() == null || req.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            return Result.error("退款金额不合法");
+        }
+        BigDecimal paidAmount = order.getTotalPrice() == null ? BigDecimal.ZERO : order.getTotalPrice();
+        if (req.getAmount().compareTo(paidAmount) > 0) {
+            return Result.error("退款金额不能大于实付金额");
+        }
+
+        order.setStatus(-1);
+        order.setRefundReason(req.getReason());
+        order.setRefundNote(req.getNote());
+        order.setRefundMethod(req.getRefundType());
+        order.setRefundTime(LocalDateTime.now());
+        boolean updated = orderService.updateById(order);
+        if (!updated) {
+            return Result.error(ResultCode.ORDER_UPDATE_FAIL);
+        }
+        return Result.success("退款处理成功");
     }
 }

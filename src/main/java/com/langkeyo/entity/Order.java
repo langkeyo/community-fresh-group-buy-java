@@ -35,6 +35,33 @@ public class Order  implements Serializable {
     @TableField("group_buy_id")
     private String groupBuyId;
 
+    @TableField("coupon_id")
+    private String couponId;
+
+    @TableField("coupon_title")
+    private String couponTitle;
+
+    @TableField("coupon_amount")
+    private BigDecimal couponAmount;
+
+    @TableField("remark")
+    private String remark;
+
+    @TableField("pay_method")
+    private String payMethod;
+
+    @TableField("refund_method")
+    private String refundMethod;
+
+    @TableField("refund_reason")
+    private String refundReason;
+
+    @TableField("refund_note")
+    private String refundNote;
+
+    @TableField("refund_time")
+    private LocalDateTime refundTime;
+
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

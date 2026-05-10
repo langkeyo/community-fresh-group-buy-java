@@ -3,11 +3,10 @@ package com.langkeyo.dto;
 import lombok.Data;
 
 @Data
-public class UserDTO {
-    private Long id;
+public class UserManageReqDTO {
     private String nickname;
     private String avatar;
+    private String mobile;
     private Boolean isLeader;
     private String adminRole;
-    private String mobile;
 }

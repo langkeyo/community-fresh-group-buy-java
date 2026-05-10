@@ -63,6 +63,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (order.getGroupBuyId() == null || order.getGroupBuyId().trim().isEmpty()) {
             order.setGroupBuyId("GB2-" + IdUtil.fastSimpleUUID());
         }
+        if (order.getPayMethod() == null || order.getPayMethod().trim().isEmpty()) {
+            order.setPayMethod("WECHAT");
+        }
 
         if (order.getProductId() != null) {
             int updated = productMapper.decreaseStock(order.getProductId());
@@ -335,6 +338,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         OrderListItemDTO dto = new OrderListItemDTO();
         dto.setId(order.getId());
         dto.setNo(order.getId());
+        dto.setUserId(order.getUserId());
         dto.setProductId(order.getProductId());
 
         String productName = productNameMap.get(order.getProductId());
@@ -342,6 +346,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
         dto.setQty(1);
         dto.setPrice(order.getTotalPrice() == null ? "0.00" : order.getTotalPrice().toPlainString());
+        dto.setCouponId(order.getCouponId());
+        dto.setCouponTitle(order.getCouponTitle());
+        dto.setCouponAmount(order.getCouponAmount() == null ? "" : order.getCouponAmount().toPlainString());
+        dto.setRemark(order.getRemark());
+        dto.setPayMethod(order.getPayMethod());
+        dto.setRefundMethod(order.getRefundMethod());
+        dto.setRefundReason(order.getRefundReason());
+        dto.setRefundNote(order.getRefundNote());
+        dto.setRefundTime(order.getRefundTime() == null ? "" : order.getRefundTime().format(DATE_TIME_FORMATTER));
         dto.setStatus(order.getStatus());
         String pickPointName = "";
         String pickPointAddress = "";

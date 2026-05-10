@@ -44,6 +44,24 @@ public class SupportTicket implements Serializable {
     @TableField("reply_time")
     private LocalDateTime replyTime;
 
+    @TableField("assigned_to")
+    private String assignedTo;
+
+    @TableField("closed_by")
+    private String closedBy;
+
+    @TableField("closed_time")
+    private LocalDateTime closedTime;
+
+    @TableField("last_message_time")
+    private LocalDateTime lastMessageTime;
+
+    @TableField("unread_admin_count")
+    private Integer unreadAdminCount;
+
+    @TableField("unread_user_count")
+    private Integer unreadUserCount;
+
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
@@ -54,4 +72,3 @@ public class SupportTicket implements Serializable {
     @TableField("deleted")
     private Integer deleted;
 }
-

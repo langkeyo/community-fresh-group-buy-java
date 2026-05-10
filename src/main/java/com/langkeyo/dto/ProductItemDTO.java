@@ -3,6 +3,7 @@ package com.langkeyo.dto;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 public class ProductItemDTO {
@@ -15,4 +16,7 @@ public class ProductItemDTO {
     private Integer stock;
     private String images;
     private Integer status;
+    private Integer groupOpen;
+    private LocalDateTime groupStartTime;
+    private LocalDateTime groupEndTime;
 }

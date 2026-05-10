@@ -15,6 +15,11 @@ public class SupportTicketItemDTO {
     private String replyContent;
     private String replyBy;
     private LocalDateTime replyTime;
+    private String assignedTo;
+    private String closedBy;
+    private LocalDateTime closedTime;
+    private LocalDateTime lastMessageTime;
+    private Integer unreadAdminCount;
+    private Integer unreadUserCount;
     private LocalDateTime createTime;
 }
-
